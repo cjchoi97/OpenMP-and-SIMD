@@ -1,7 +1,9 @@
+CPPFLAGS = -Wall -Wextra -pedantic
+
 all:
-	g++ -o exec.out sphere.cpp
+	g++ $(CPPFLAGS) -o exec.out spheres.cpp -fopenmp
 
 test: all
-	./exec.out false 100000 16 20 100
+	./exec.out false 1000 16 20 100
 clean:
 	rm *.out
