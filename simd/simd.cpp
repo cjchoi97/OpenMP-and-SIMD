@@ -21,7 +21,7 @@ time(const std::function<void ()> &f) {
 int
 main() {
 
-    alignas(32) static float x[N], y[N], z[N];
+    alignas(32) static float a[N], b[N], c[N], d[N], w[N], x[N], y[N], z[N];
 
     /*
      * Generate data.
@@ -30,6 +30,11 @@ main() {
     std::default_random_engine eng;
     std::uniform_real_distribution<float> dist(-1, 1);
     for (int i = 0; i < N; i++) {
+        a[i] = dist(eng);
+        b[i] = dist(eng);
+        c[i] = dist(eng);
+        d[i] = dist(eng);
+        w[i] = dist(eng);
         x[i] = dist(eng);
         y[i] = dist(eng);
         z[i] = dist(eng);
@@ -42,7 +47,11 @@ main() {
     static float l_s[N];
     auto seq = [&]() {
         for (int i = 0; i < N; i++) {
-            l_s[i] = std::sqrt(x[i]*x[i] + y[i]*y[i] + z[i]*z[i]);
+            l_s[i] = std::sqrt(
+              (a[i] - w[i]) * (a[i] - w[i]) +
+              (b[i] - x[i]) * (b[i] - x[i]) +
+              (c[i] - y[i]) * (c[i] - y[i]) +
+              (d[i] - z[i]) * (d[i] - z[i]));
         }
     };
 
@@ -50,16 +59,28 @@ main() {
 
     alignas(32) static float l_v[N];
     auto vec = [&]() {
-        for (int i = 0; i < N/8; i++) {
-            __m256 ymm_x = _mm256_load_ps(x + 8*i);
-            __m256 ymm_y = _mm256_load_ps(y + 8*i);
-            __m256 ymm_z = _mm256_load_ps(z + 8*i);
-            __m256 ymm_l = _mm256_sqrt_ps(_mm256_mul_ps(ymm_x, ymm_x) + _mm256_mul_ps(ymm_y, ymm_y) + _mm256_mul_ps(ymm_z, ymm_z));
-            _mm256_store_ps(l_v + 8*i, ymm_l);
-        }
+      for (int i = 0; i < N/8; i++) {
+          __m256 mm_a = _mm256_load_ps(a + 8*i);
+          __m256 mm_b = _mm256_load_ps(b + 8*i);
+          __m256 mm_c = _mm256_load_ps(c + 8*i);
+          __m256 mm_d = _mm256_load_ps(d + 8*i);
+
+          __m256 mm_w = _mm256_load_ps(w + 8*i);
+          __m256 mm_x = _mm256_load_ps(x + 8*i);
+          __m256 mm_y = _mm256_load_ps(y + 8*i);
+          __m256 mm_z = _mm256_load_ps(z + 8*i);
+
+          __m256 mm_l = _mm256_sqrt_ps(
+              _mm256_mul_ps(mm_a - mm_w, mm_a - mm_w) +
+              _mm256_mul_ps(mm_b - mm_x, mm_b - mm_x) +
+              _mm256_mul_ps(mm_c - mm_y, mm_c - mm_y) +
+              _mm256_mul_ps(mm_d - mm_z, mm_d - mm_z));
+
+          _mm256_store_ps(l_v + 8*i, mm_l);
+      }
     };
 
-    std::cout << "Vector: " << (N/time(vec))/1000000 << " Mops/s" << std::endl;
+    std::cout << "Parallel: " << (N/time(vec))/1000000 << " Mops/s" << std::endl;
 
     for (int i = 0; i < N; i++) {
         if (l_s[i] - l_v[i] != 0) {
